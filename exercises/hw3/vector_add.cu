@@ -15,42 +15,47 @@
 
 
 const int DSIZE = 32*1048576;
-// vector add kernel: C = A + B
-__global__ void vadd(const float *A, const float *B, float *C, int ds){
 
-  for (int idx = threadIdx.x+blockDim.x*blockIdx.x; idx < ds; idx+=gridDim.x*blockDim.x)         // a grid-stride loop
-    FIXME         // do the vector (element) add here
+// vector addition kernel: C = A + B
+__global__ void vadd(const int ds, const float *A, const float *B, float *C) {
+  // grid-stride loop
+  for (int idx = threadIdx.x + blockIdx.x * blockDim.x; idx < ds; idx += blockDim.x * gridDim.x) {
+    C[idx] = A[idx] + B[idx];
+  }
 }
 
-int main(){
-
+int main() {
   float *h_A, *h_B, *h_C, *d_A, *d_B, *d_C;
-  h_A = new float[DSIZE];  // allocate space for vectors in host memory
+
+  h_A = new float[DSIZE];
   h_B = new float[DSIZE];
   h_C = new float[DSIZE];
-  for (int i = 0; i < DSIZE; i++){  // initialize vectors in host memory
+
+  for (int i = 0; i < DSIZE; ++i) {
     h_A[i] = rand()/(float)RAND_MAX;
     h_B[i] = rand()/(float)RAND_MAX;
-    h_C[i] = 0;}
-  cudaMalloc(&d_A, DSIZE*sizeof(float));  // allocate device space for vector A
-  FIXME // allocate device space for vector B
-  FIXME // allocate device space for vector C
-  cudaCheckErrors("cudaMalloc failure"); // error checking
-  // copy vector A to device:
-  cudaMemcpy(d_A, h_A, DSIZE*sizeof(float), cudaMemcpyHostToDevice);
-  // copy vector B to device:
-  FIXME
+    h_C[i] = 0;
+  }
+
+  cudaMalloc(&d_A, DSIZE * sizeof(float));
+  cudaMalloc(&d_B, DSIZE * sizeof(float));
+  cudaMalloc(&d_C, DSIZE * sizeof(float));
+
+  cudaCheckErrors("cudaMalloc failure");
+
+  cudaMemcpy(d_A, h_A, DSIZE * sizeof(float), cudaMemcpyHostToDevice);
+  cudaMemcpy(d_B, h_B, DSIZE * sizeof(float), cudaMemcpyHostToDevice);
+
   cudaCheckErrors("cudaMemcpy H2D failure");
-  //cuda processing sequence step 1 is complete
-  int blocks = 1;  // modify this line for experimentation
-  int threads = 1; // modify this line for experimentation
-  vadd<<<blocks, threads>>>(d_A, d_B, d_C, DSIZE);
-  cudaCheckErrors("kernel launch failure");
-  //cuda processing sequence step 2 is complete
-  // copy vector C from device to host:
-  FIXME
-  //cuda processing sequence step 3 is complete
-  cudaCheckErrors("kernel execution failure or cudaMemcpy H2D failure");
+
+  int num_blocks_per_grid = 160;
+  int num_threads_per_block = 1024;
+  vadd<<<num_blocks_per_grid, num_threads_per_block>>>(DSIZE, d_A, d_B, d_C);
+
+  cudaMemcpy(h_C, d_C, DSIZE * sizeof(float), cudaMemcpyDeviceToHost);
+
+  cudaCheckErrors("kernel execution failure or cudaMemcpy D2H failure");
+
   printf("A[0] = %f\n", h_A[0]);
   printf("B[0] = %f\n", h_B[0]);
   printf("C[0] = %f\n", h_C[0]);
